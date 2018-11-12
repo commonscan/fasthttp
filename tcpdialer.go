@@ -175,8 +175,8 @@ func (d *tcpDialer) NewDial(timeout time.Duration) DialFunc {
 			return nil, err
 		}
 		network := "tcp4"
-		if d.DualStack {
-			network = "tcp"
+		if d.DualStack { // use DualStack here
+			network = "tcp6"
 		}
 
 		var conn net.Conn
