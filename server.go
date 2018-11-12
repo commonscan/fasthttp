@@ -546,6 +546,7 @@ func (ctx *RequestCtx) VisitUserValues(visitor func([]byte, interface{})) {
 }
 
 type connTLSer interface {
+	Handshake() error
 	ConnectionState() tls.ConnectionState
 }
 
@@ -1267,10 +1268,12 @@ func (s *Server) NextProto(key string, nph ServeHandler) {
 	s.nextProtos[key] = nph
 }
 
-func (s *Server) hasNextProto(c net.Conn) (proto string) {
-	tlsConn, ok := c.(connTLSer)
-	if ok {
-		proto = tlsConn.ConnectionState().NegotiatedProtocol
+func (s *Server) getNextProto(c net.Conn) (proto string, err error) {
+	if tlsConn, ok := c.(connTLSer); ok {
+		err = tlsConn.Handshake()
+		if err == nil {
+			proto = tlsConn.ConnectionState().NegotiatedProtocol
+		}
 	}
 	return
 }
@@ -1747,7 +1750,9 @@ const DefaultMaxRequestBodySize = 4 * 1024 * 1024
 func (s *Server) serveConn(c net.Conn) error {
 	defer atomic.AddInt32(&s.open, -1)
 
-	if proto := s.hasNextProto(c); proto != "" {
+	if proto, err := s.getNextProto(c); err != nil {
+		return err
+	} else {
 		handler, ok := s.nextProtos[proto]
 		if ok {
 			return handler(c)
